@@ -1,0 +1,25 @@
+# Copyright (c) 2025 Ekkodale GmbH. All rights reserved.
+#
+# This file is part of the gaeco platform system.
+#
+# Use of this file is governed by the terms of the license
+# in LICENSE.md at the root of this repository.
+# Unauthorized copying, modification, distribution, or use of this file,
+# via any medium, is strictly prohibited except as expressly permitted
+# under that license.
+
+packageId: ontology-service
+version: 1.0.0
+name: Ontology Service
+description: "Gaeco Ontology Service - Manages and provides ontologies in the Gaeco ecosystem."
+dockerComposeFile: "docker-compose.yml"
+envSchemaFile: ".env.schema.yaml"
+iconFile: "icon.svg"
+readmeFile: "README.md"
+documentationUrl: "https://dev.azure.com/ekkodale/gaeco/_wiki/wikis/OntologyService%20Wiki?wikiVersion=GBdev&pagePath=/developer"
+repositoryUrl: "https://dev.azure.com/ekkodale/gaeco/_git/OntologyService"
+isPrivate: true
+tags:
+  - gaeco
+  - ontology
+  - plugin

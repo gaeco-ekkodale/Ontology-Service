@@ -1,0 +1,110 @@
+# Copyright (c) 2025 Ekkodale GmbH. All rights reserved.
+#
+# This file is part of the gaeco platform system.
+#
+# Use of this file is governed by the terms of the license
+# in LICENSE.md at the root of this repository.
+# Unauthorized copying, modification, distribution, or use of this file,
+# via any medium, is strictly prohibited except as expressly permitted
+# under that license.
+
+services:
+  ontology-postgres:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${ONTOLOGY_POSTGRES_PASSWORD}
+      POSTGRES_USER: ${ONTOLOGY_POSTGRES_USER}
+      POSTGRES_DB: ${ONTOLOGY_POSTGRES_DATABASE}
+    expose:
+      - 5432
+    volumes:
+      # Long "type: bind" form so `docker compose config --no-path-resolution` keeps
+      # the ${VOLUME_BASE_PATH} source intact (short form gets mis-typed as a volume).
+      - type: bind
+        source: ${VOLUME_BASE_PATH}/ontology/postgres/
+        target: /var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-q",
+          "-h",
+          "127.0.0.1",
+          "-d",
+          "${ONTOLOGY_POSTGRES_DATABASE}",
+          "-U",
+          "${ONTOLOGY_POSTGRES_USER}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 50
+      start_period: 30s
+
+  ontology-server:
+    image: ${IMAGE_BASE_PATH}/ontology-server:${ONTOLOGY_SERVER_TAG}
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - Postgres__Host=ontology-postgres
+      - Postgres__Port=5432
+      - Postgres__User=${ONTOLOGY_POSTGRES_USER}
+      - Postgres__Password=${ONTOLOGY_POSTGRES_PASSWORD}
+      - Postgres__Database=${ONTOLOGY_POSTGRES_DATABASE}
+      - Kafka__Address=${KAFKA_ADDRESS}
+      - Kafka__AutoOffsetReset=${KAFKA_AUTO_OFFSET_RESET}
+      - Kafka__SessionTimeoutMs=${KAFKA_SESSION_TIMEOUT_MS}
+      - Kafka__MaxPollIntervalMs=${KAFKA_MAX_POLL_INTERVAL_MS}
+      - Kafka__Topics__Ontology=${KAFKA_TOPICS_ONTOLOGY}
+      - Minio__Address=${MINIO_ADDRESS}
+      - Minio__AccessKey=${MINIO_ROOT_USER}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD}
+      - OpenTelemetry__OtlpEndpoint=${OTLP_ENDPOINT}
+      - Keycloak__ServerUrl=https://${KEYCLOAK_SERVER_HOSTNAME}
+      - Keycloak__Realm=${KEYCLOAK_REALM}
+      - Keycloak__Authority=https://${KEYCLOAK_SERVER_HOSTNAME}/realms/${KEYCLOAK_REALM}
+      - AllowedCorsOrigins__ServerUrl=${ALLOWED_CORS_ORIGIN}
+    expose:
+      - 80
+    depends_on:
+      ontology-postgres:
+        condition: service_healthy
+    volumes:
+      # Long "type: bind" form so `docker compose config --no-path-resolution` keeps
+      # the ${VOLUME_BASE_PATH} source intact (short form gets mis-typed as a volume).
+      - type: bind
+        source: ${VOLUME_BASE_PATH}/ontology/data
+        target: /app/Assets
+    networks:
+      - internal
+      - gaeco-network
+      - traefik-proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/localhost/80 && echo -e 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 50
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-proxy"
+      - "traefik.http.routers.${STACK_NAME}-server.rule=Host(`${ONTOLOGY_SERVER_HOSTNAME}`)"
+      - "traefik.http.routers.${STACK_NAME}-server.entrypoints=https"
+      - "traefik.http.routers.${STACK_NAME}-server.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${STACK_NAME}-server.loadbalancer.server.port=80"
+
+networks:
+  internal:
+  gaeco-network:
+    name: ${ENVIRONMENT_NETWORK}
+    external: true
+  traefik-proxy:
+    name: ${TRAEFIK_NETWORK}
+    external: true

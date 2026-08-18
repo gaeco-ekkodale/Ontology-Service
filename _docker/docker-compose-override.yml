@@ -1,0 +1,38 @@
+# Copyright (c) 2025 Ekkodale GmbH. All rights reserved.
+#
+# This file is part of the gaeco platform system.
+#
+# Use of this file is governed by the terms of the license
+# in LICENSE.md at the root of this repository.
+# Unauthorized copying, modification, distribution, or use of this file,
+# via any medium, is strictly prohibited except as expressly permitted
+# under that license.
+
+# Local deltas on top of docker-compose.yml: published host ports, http/localhost URLs
+# and build-from-source. Run locally:
+#   docker compose -f docker-compose.yml -f docker-compose-override.yml up
+# The packaged "-local" compose is generated from docker-compose.yml + this file
+# (see build/Build.Release.CD.cs -> GenerateLocalComposeFile). The package keeps these
+# build: sections; harmless, because the orchestrator pulls the image first and only
+# falls back to build (which then no-ops on the missing context) if the pull fails.
+name: ontology-service
+services:
+
+  ontology-postgres:
+    ports:
+      - ${ONTOLOGY_POSTGRES_OUTERPORT}:5432
+  ontology-server:
+    ports:
+      - "${ONTOLOGY_SERVER_OUTERPORT}:80"
+    environment:
+      - Keycloak__ServerUrl=http://keycloak-server:8080
+      - Keycloak__Authority=http://${KEYCLOAK_SERVER_HOSTNAME}/realms/${KEYCLOAK_REALM}
+    build:
+      context: ../Server
+      dockerfile: Api/Dockerfile
+      secrets:
+        - nugetconfig
+
+secrets:
+  nugetconfig:
+    file: ../../_docker/docker-compose-files/nuget.config
